@@ -1,5 +1,6 @@
-# Build Python package and dependencies
-FROM python:3.12-alpine AS python-build
+FROM python:3.12-alpine
+
+# Install build deps + runtime deps together
 RUN apk add --no-cache \
         git \
         libffi-dev \
@@ -16,58 +17,37 @@ RUN apk add --no-cache \
         lcms2-dev \
         libwebp-dev \
         openssl-dev \
-        cargo
-RUN mkdir -p /opt/venv
-WORKDIR /opt/venv
+        cargo \
+        fastfetch \
+        libstdc++ \
+        snappy
+
+# Set up venv
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
+# Install bot
 RUN mkdir -p /src
 WORKDIR /src
-
-# Install bot package and dependencies
 COPY . .
-RUN pip install wheel
-RUN pip install .[fast]
-RUN pip install uvloop
+RUN pip install wheel && pip install .[fast] && pip install uvloop
 
+# Clean up build deps (keep runtime ones)
+RUN apk del gcc g++ musl-dev make cargo \
+        zlib-dev tiff-dev freetype-dev libpng-dev \
+        libjpeg-turbo-dev lcms2-dev libwebp-dev openssl-dev \
+        libffi-dev leveldb-dev && \
+    rm -rf /src /root/.cache /root/.cargo
 
-# Package everything
-FROM python:3.12-alpine AS final
-# Install optional native tools (for full functionality)
-RUN apk add --no-cache fastfetch
-# Install native dependencies
+# Re-add runtime libs that were pulled as deps of -dev packages
 RUN apk add --no-cache \
-        libffi \
-        libstdc++ \
-        snappy \
-        zlib \
-        tiff \
-        freetype \
-        libpng \
-        libjpeg-turbo \
-        lcms2 \
-        libwebp
+        libffi leveldb libstdc++ snappy \
+        zlib tiff freetype libpng libjpeg-turbo lcms2 libwebp
 
-# Copy leveldb shared libs from the build stage to ensure ABI match with plyvel
-COPY --from=python-build /usr/lib/libleveldb.so* /usr/lib/
+# Create bot user and data dir
+RUN adduser -D pyrobud && mkdir -p /data && chown pyrobud:pyrobud /data
+VOLUME ["/data"]
 
-# Create bot user
-RUN adduser -D pyrobud
-
-# Create data directory for the bot user
-RUN mkdir -p /data
-RUN chown pyrobud:pyrobud /data
-
-# Ensure we a volume is mounted even if the user doesn't explicitly specify it,
-# to prevent unintentional data loss
-VOLUME [ "/data" ]
-
-# Copy Python venv
-ENV PATH="/opt/venv/bin:$PATH"
-COPY --from=python-build /opt/venv /opt/venv
-
-# Set runtime settings
 USER pyrobud
 WORKDIR /data
 CMD ["pyrobud"]
