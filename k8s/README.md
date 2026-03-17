@@ -13,14 +13,11 @@ Run pyrobud on Kubernetes with persistent storage for the database and Telegram 
 ### 1. Build the image
 
 ```bash
-docker build -t pyrobud:latest .  # or: podman build --net=host -t pyrobud:latest .
+podman build -t pyrobud:latest .
+podman save pyrobud:latest | sudo k3s ctr images import -
 ```
 
-k3s imports images from the local Docker daemon automatically via containerd. If your nodes don't share the Docker daemon, import manually:
-
-```bash
-docker save pyrobud:latest | sudo k3s ctr images import -
-```
+Podman tags as `localhost/pyrobud:latest` — the k8s manifests expect this.
 
 ### 2. Create your config secret
 
@@ -77,8 +74,8 @@ The StatefulSet will recreate it with the updated config. The init container onl
 ## Updating the bot image
 
 ```bash
-docker build -t pyrobud:latest .  # or: podman build --net=host -t pyrobud:latest .
-docker save pyrobud:latest | sudo k3s ctr images import -
+podman build -t pyrobud:latest .
+podman save pyrobud:latest | sudo k3s ctr images import -
 kubectl rollout restart -n pyrobud statefulset/pyrobud
 ```
 

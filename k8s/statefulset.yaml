@@ -40,7 +40,7 @@ spec:
               readOnly: true
       containers:
         - name: pyrobud
-          image: pyrobud:latest
+          image: localhost/pyrobud:latest
           imagePullPolicy: Never
           stdin: true
           tty: true
